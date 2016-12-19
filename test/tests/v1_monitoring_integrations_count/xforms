@@ -1,0 +1,6 @@
+https?://[^/]*(:d+)?
+SERVER_AND_POSSIBLE_PORT
+Linux
+FreeBSD
+integrations\[\d+\]
+integrations[0]

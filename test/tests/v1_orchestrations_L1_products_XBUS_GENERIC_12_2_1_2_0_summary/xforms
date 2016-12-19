@@ -1,0 +1,2 @@
+https?://[^/]*(:d+)?
+SERVER_AND_POSSIBLE_PORT

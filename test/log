@@ -1,0 +1,11 @@
+2016-12-08 06:37:09,420 [http-bio-8080-exec-6] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Requesting GET for path v1/monitoring/integrations/count 
+2016-12-08 06:37:09,421 [http-bio-8080-exec-6] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Response 209 
+2016-12-08 06:37:28,274 [http-bio-8080-exec-1] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Requesting GET for path v1/integrations/L1/summary 
+2016-12-08 06:37:28,292 [http-bio-8080-exec-1] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Response [ {
+  "id" : "5567cc82c2e66ad1e254c5bf",
+  "url" : "http://slcipau.us.acme.com:8080/a/b/c",
+  "z" : "integrations[76]",
+  "display_name" : "Asclassic L1 Linux.x64"
+} ] 
+2016-12-08 06:37:54,111 [http-bio-8080-exec-10] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Requesting GET for path v1/monitoring/integrations/count 
+2016-12-08 06:37:54,111 [http-bio-8080-exec-10] DEBUG c.o.s.c.r.f.LoggingResponseFilter - Response 209 
