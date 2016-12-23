@@ -25,6 +25,9 @@ class Rest_Test
                 end
                 self.expected_response_text = self.normalize_json(expected_response_text)
         end
+        def ==(o)
+                o.class == self.class && o.state == state
+        end
         def assert_eq(actual, caller_msg=nil, no_raise_if_fail=false, silent=false)
                 expected = self.expected_response_text
                 if U.assert_eq(expected, actual, caller_msg, no_raise_if_fail, true)
@@ -56,7 +59,12 @@ class Rest_Test
                 ok = true
                 begin
                         if save_diffs
-                                U.next_diff_output = "#{self.src_dir}/diff"
+                                if Rest_Test.test_output_dir
+                                        tod = Rest_Test.test_output_dir
+                                else
+                                        tod = self.src_dir
+                                end
+                                U.next_diff_output = "#{tod}/diff"
                         end
                         if !self.assert_eq(actual_response_text, nil, true)
                                 if !is_retry && Rest_Test.refresh_expected_on_test_diff
@@ -121,10 +129,16 @@ class Rest_Test
         def to_s()
                 "Rest_Test(#{rest_of_url})"
         end
+        protected
+
+        def state
+                [@expected_response_text, @name, @original_server_url, @rest_of_url]
+        end
         class << self
                 attr_accessor :default_xforms
                 attr_accessor :silent_mode
                 attr_accessor :generated_tests_dir
+                attr_accessor :test_output_dir
                 attr_accessor :refresh_expected_on_test_diff
                 attr_accessor :reset_expected
                 
@@ -185,6 +199,7 @@ end
 class Rest_Test_Generator
         NONEXISTENT_URL = "http://some_server_that_will_be_recorded_as_the_source_of_the_log:8080/api"
         attr_accessor :log_files_to_parse
+        attr_accessor :test_output_dir
         attr_accessor :save_diffs
         attr_accessor :server_url
         attr_accessor :tests
@@ -360,8 +375,12 @@ class Rest_Test_Generator
                 )
                 tests_read_from_disk = self.read_tests_from()
                 U.assert_eq(2, tests_read_from_disk.length)
-                U.assert_eq(tests[0], tests_read_from_disk[1])
-                U.assert_eq(tests[1], tests_read_from_disk[0])
+                if tests[0] != tests_read_from_disk[1] && tests[0] != tests_read_from_disk[0]
+                        U.assert(false, "unexpected test mismatch -- #{tests[0]}!=#{tests_read_from_disk[1]}, also !=#{tests_read_from_disk[0]}")
+                end 
+                if tests[1] != tests_read_from_disk[1] && tests[1] != tests_read_from_disk[0]
+                        U.assert(false, "could not find t1")
+                end 
                 puts "OK rest_test_generator"
                 if saved_server_url
                         self.server_url = saved_server_url
@@ -428,6 +447,9 @@ while ARGV.size > j do
                 Rest_Test.generated_tests_dir = dir
         when "-no_default_server_suppression"
                 rtg.suppress_server_names = false
+        when /^-test_output_dir|-o$/
+                j += 1
+                rtg.test_output_dir = ARGV[j]
         when "-parse_log"
                 ARGV[j+1..-1].each do | log_fn |
                         rtg.add_log_file_to_parse_later(log_fn)
