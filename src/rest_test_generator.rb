@@ -6,18 +6,20 @@ require_relative 'u.rb'
 require_relative 'json_flattener.rb'
 
 class Rest_Test
+        attr_accessor :original_raw_text
         attr_accessor :expected_response_text
         attr_accessor :name
         attr_accessor :original_server_url
-        attr_accessor :src_dir
         attr_accessor :rest_of_url
+        attr_accessor :src_dir
         attr_accessor :xforms
-        def initialize(rest_of_url, expected_response_text, original_server_url, xforms, src_dir)
+        def initialize(rest_of_url, expected_response_text, original_server_url, xforms, src_dir, original_raw_text)
                 puts "Rest_Test(#{rest_of_url}, #{expected_response_text})" if Rest_Test_Generator.verbose
-                self.rest_of_url = rest_of_url
-                self.src_dir = src_dir
+                self.original_raw_text = original_raw_text
                 self.name = Rest_Test.url2name(rest_of_url)
                 self.original_server_url = original_server_url
+                self.rest_of_url = rest_of_url
+                self.src_dir = src_dir
                 if xforms
                         self.xforms = xforms
                 else
@@ -30,24 +32,33 @@ class Rest_Test
         end
         def assert_eq(actual, caller_msg=nil, no_raise_if_fail=false, silent=false)
                 expected = self.expected_response_text
+                success = false
                 if U.assert_eq(expected, actual, caller_msg, no_raise_if_fail, true)
                         puts "Rest_Test.assert_eq immediate success: #{actual}" if Rest_Test_Generator.verbose
-                        return true
+                        success = true
                 end
-                expected.gsub!(/^\s*/, '')
-                expected << "\n" unless expected.end_with?("\n")
-                if actual != expected
-                        actual = self.normalize_json(actual)
+                if !success
+                        expected.gsub!(/^\s*/, '')
+                        expected << "\n" unless expected.end_with?("\n")
+                        if actual == expected
+                                success = true
+                        else
+                                actual = self.normalize_json(actual)
+                                if actual == expected
+                                        success = true
+                                end
+                        end
                 end
-                if Rest_Test.reset_expected && actual != expected
+                if Rest_Test.reset_expected
                         puts "Resetting expected_response_text for #{self.name} based on response from #{self.original_server_url}"
                         self.expected_response_text = actual
+                        self.original_server_url = 
                         self.save
                         success = true
                 else
                         success = U.assert_eq(expected, actual, caller_msg, no_raise_if_fail, silent)
-                        puts "Rest_Test_Generator.assert_eq: expected:\n#{expected}\nEOD\nactual:\n#{actual}\nEOD\n" if Rest_Test_Generator.verbose
                 end
+                puts "Rest_Test_Generator.assert_eq: expected:\n#{expected}\nEOD\nactual:\n#{actual}\nEOD\n" if Rest_Test_Generator.verbose
                 success
         end
         def execute(server_url, save_diffs, is_retry=false)
@@ -55,7 +66,7 @@ class Rest_Test
                 url = server_url + "/" + self.rest_of_url
                 puts "\tExecuting test #{self.name} at #{src_dir}" unless Rest_Test.silent_mode
                 puts "\tFetching #{url}"                           unless Rest_Test.silent_mode
-                actual_response_text = U.rest_get(url)
+                actual_raw_text = U.rest_get(url)
                 ok = true
                 begin
                         if save_diffs
@@ -66,7 +77,11 @@ class Rest_Test
                                 end
                                 U.next_diff_output = "#{tod}/diff"
                         end
-                        if !self.assert_eq(actual_response_text, nil, true)
+                        if Rest_Test.reset_expected
+                                self.original_server_url = server_url
+                                self.original_raw_text = actual_raw_text
+                        end
+                        if !self.assert_eq(actual_raw_text, nil, true)
                                 if !is_retry && Rest_Test.refresh_expected_on_test_diff
                                         self.refresh_expected_response_text()
                                         if !execute(server_url, save_diffs, true)
@@ -112,7 +127,7 @@ class Rest_Test
         end
         def save()
                 if !Rest_Test.generated_tests_dir
-                        Rest_Test.generated_tests_dir = Dir.pwd + "/tests"
+                        raise "-generated_tests_dir required"
                 end
                 root = Rest_Test.generated_tests_dir + "/" + name
                 if !File.directory?(root)
@@ -121,9 +136,10 @@ class Rest_Test
                 else
                         puts "\tWriting test to directory #{root}" unless Rest_Test.silent_mode
                 end
+                IO.write("#{root}/original_raw_text", self.original_raw_text)
                 IO.write("#{root}/expected", self.expected_response_text)
-                IO.write("#{root}/rest_of_url",      self.rest_of_url)
                 IO.write("#{root}/original_server_url",      self.original_server_url)
+                IO.write("#{root}/rest_of_url",      self.rest_of_url)
                 String_xform.write_xforms_to_file(self.xforms, "#{root}/xforms")
         end
         def to_s()
@@ -150,15 +166,20 @@ class Rest_Test
                         Rest_Test.default_xforms << xf
                 end
                 def assert_eq(expected, actual, caller_msg=nil, no_raise_if_fail=false, silent=false)
-                        rt = Rest_Test.new("/some/rest/call", expected, "http://not_real_just_unit_testing:80801/api", nil, "/some/nonexistent/path")
+                        rt = Rest_Test.new("/some/rest/call", expected, "http://not_real_just_unit_testing:80801/api", nil, "/path/to/src_dir", "/pat/to/actual_response_text")
                         return rt.assert_eq(actual, caller_msg, no_raise_if_fail, silent)
                 end
                 def from_dir(dir)
                         rest_of_url = IO.read("#{dir}/rest_of_url")
                         expected_response_text = IO.read("#{dir}/expected")
+                        if File.exist?("#{dir}/original_raw_text")
+                                original_raw_text = IO.read("#{dir}/original_raw_text")
+                        else
+                                original_raw_text = "UNSET"
+                        end
                         original_server_url = IO.read("#{dir}/original_server_url")
                         xforms = String_xform.parse_xforms_from_file("#{dir}/xforms")
-                        Rest_Test.new(rest_of_url, expected_response_text, original_server_url, xforms, dir)
+                        Rest_Test.new(rest_of_url, expected_response_text, original_server_url, xforms, dir, original_raw_text)
                 end
                 def from_url(server_url, generated_test_src_url)
                         raise "server_url required" unless server_url
@@ -166,10 +187,13 @@ class Rest_Test
                         url = server_url + "/" + generated_test_src_url
                         dir = Rest_Test.generated_tests_dir + "/" + url2name(generated_test_src_url)
                         puts "Creating test pointed at #{dir} based on #{url}" unless Rest_Test.silent_mode
-                        expected_response_text = U.rest_get(url)
+                        original_raw_text = U.rest_get(url)
                         original_server_url = server_url
                         xforms = Rest_Test.default_xforms
-                        rt = Rest_Test.new(generated_test_src_url, expected_response_text, original_server_url, xforms, dir)
+                        
+                        expected_response_text = original_raw_text
+                        
+                        rt = Rest_Test.new(generated_test_src_url, expected_response_text, original_server_url, xforms, dir, original_raw_text)
                         rt.save
                         rt
                 end
@@ -246,7 +270,7 @@ class Rest_Test_Generator
                         if rest_of_url
                                 if new_log_entry_starting
                                         puts "end for #{rest_of_url} expected_response_text=#{expected_response_text}" if Rest_Test_Generator.verbose
-                                        url_to_rt[rest_of_url] = Rest_Test.new(rest_of_url, expected_response_text, self.server_url, Rest_Test.default_xforms, nil)
+                                        url_to_rt[rest_of_url] = Rest_Test.new(rest_of_url, expected_response_text, self.server_url, Rest_Test.default_xforms, nil, expected_response_text)
                                         rest_of_url = expected_response_text = nil
                                 else
                                         if line =~ /.* Response (.*)/
@@ -270,7 +294,7 @@ class Rest_Test_Generator
                 end
                 if rest_of_url
                         puts "EOF, so end for #{rest_of_url} expected_response_text=#{expected_response_text}" if Rest_Test_Generator.verbose
-                        url_to_rt[rest_of_url] = Rest_Test.new(rest_of_url, expected_response_text, self.server_url, Rest_Test.default_xforms, nil)
+                        url_to_rt[rest_of_url] = Rest_Test.new(rest_of_url, expected_response_text, self.server_url, Rest_Test.default_xforms, nil, expected_response_text)
                 end
         end
         def parse_log_files()
@@ -474,6 +498,7 @@ while ARGV.size > j do
                 exit(0)
         when "-v"
                 Rest_Test_Generator.verbose = true
+                Rest_Test.silent_mode = false
         when "-xform"
                 j += 1
                 before_regexp_string = ARGV[j]
