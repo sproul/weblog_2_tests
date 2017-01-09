@@ -74,6 +74,7 @@ class Rest_Test
                         else
                                 tod = self.src_dir
                         end
+                        IO.write("#{tod}/latest_raw_text", actual_raw_text)
                         U.next_diff_output = "#{tod}/diff"
                         if Rest_Test.reset_expected
                                 self.original_server_url = server_url
