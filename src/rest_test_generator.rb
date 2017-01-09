@@ -52,7 +52,7 @@ class Rest_Test
                 if Rest_Test.reset_expected
                         puts "Resetting expected_response_text for #{self.name} based on response from #{self.original_server_url}"
                         self.expected_response_text = actual
-                        self.original_server_url = 
+                        self.original_server_url =
                         self.save
                         success = true
                 else
@@ -61,7 +61,7 @@ class Rest_Test
                 puts "Rest_Test_Generator.assert_eq: expected:\n#{expected}\nEOD\nactual:\n#{actual}\nEOD\n" if Rest_Test_Generator.verbose
                 success
         end
-        def execute(server_url, save_diffs, is_retry=false)
+        def execute(server_url, is_retry=false)
                 raise "require server_url" unless server_url
                 url = server_url + "/" + self.rest_of_url
                 puts "\tExecuting test #{self.name} at #{src_dir}" unless Rest_Test.silent_mode
@@ -69,14 +69,12 @@ class Rest_Test
                 actual_raw_text = U.rest_get(url)
                 ok = true
                 begin
-                        if save_diffs
-                                if Rest_Test.test_output_dir
-                                        tod = Rest_Test.test_output_dir
-                                else
-                                        tod = self.src_dir
-                                end
-                                U.next_diff_output = "#{tod}/diff"
+                        if Rest_Test.test_output_dir
+                                tod = Rest_Test.test_output_dir
+                        else
+                                tod = self.src_dir
                         end
+                        U.next_diff_output = "#{tod}/diff"
                         if Rest_Test.reset_expected
                                 self.original_server_url = server_url
                                 self.original_raw_text = actual_raw_text
@@ -84,7 +82,7 @@ class Rest_Test
                         if !self.assert_eq(actual_raw_text, nil, true)
                                 if !is_retry && Rest_Test.refresh_expected_on_test_diff
                                         self.refresh_expected_response_text()
-                                        if !execute(server_url, save_diffs, true)
+                                        if !execute(server_url, true)
                                                 ok = false
                                         end
                                 else
@@ -224,7 +222,6 @@ class Rest_Test_Generator
         NONEXISTENT_URL = "http://some_server_that_will_be_recorded_as_the_source_of_the_log:8080/api"
         attr_accessor :log_files_to_parse
         attr_accessor :test_output_dir
-        attr_accessor :save_diffs
         attr_accessor :server_url
         attr_accessor :tests
 
@@ -253,7 +250,7 @@ class Rest_Test_Generator
                 raise "no tests" if self.tests.empty?
                 ok = true
                 self.tests.each do | test |
-                        if !test.execute(self.server_url, self.save_diffs)
+                        if !test.execute(self.server_url)
                                 ok = false
                         end
                 end
@@ -484,8 +481,6 @@ while ARGV.size > j do
                 Rest_Test.refresh_expected_on_test_diff = true
         when "-reset_expected"
                 Rest_Test.reset_expected = true
-        when "-save_diffs"
-                rtg.save_diffs = true
         when "-server_url"
                 j += 1
                 rtg.server_url = ARGV[j]

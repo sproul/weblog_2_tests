@@ -323,7 +323,7 @@ class U
                         end
                 end
                 def assert_file_exists(fn)
-                        U.assert(File.exists?(fn), "could not find file #{fn} (looking from #{File.dirname(".")}")
+                        U.assert(File.exist?(fn), "could not find file #{fn} (looking from #{File.dirname(".")}")
                 end
                 def properties_read(fn)
                         h = Hash.new
