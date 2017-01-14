@@ -6,9 +6,9 @@ require_relative 'u.rb'
 require_relative 'json_flattener.rb'
 
 class Rest_Test
-        attr_accessor :original_raw_text
         attr_accessor :expected_response_text
         attr_accessor :name
+        attr_accessor :original_raw_text
         attr_accessor :original_server_url
         attr_accessor :rest_of_url
         attr_accessor :src_dir
@@ -52,7 +52,6 @@ class Rest_Test
                 if Rest_Test.reset_expected
                         puts "Resetting expected_response_text for #{self.name} based on response from #{self.original_server_url}"
                         self.expected_response_text = actual
-                        self.original_server_url =
                         self.save
                         success = true
                 else
@@ -68,13 +67,18 @@ class Rest_Test
                 puts "\tFetching #{url}"                           unless Rest_Test.silent_mode
                 actual_raw_text = U.rest_get(url)
                 ok = true
+                if Rest_Test.reset_expected
+                        self.original_server_url = server_url
+                end
                 begin
                         if Rest_Test.test_output_dir
                                 tod = Rest_Test.test_output_dir
                         else
                                 tod = self.src_dir
                         end
+                        IO.write("/tmp/weblog_2_tests__last_test_dir", tod)
                         IO.write("#{tod}/latest_raw_text", actual_raw_text)
+                        IO.write("#{tod}/test_server_url", server_url)
                         U.next_diff_output = "#{tod}/diff"
                         if Rest_Test.reset_expected
                                 self.original_server_url = server_url
@@ -97,6 +101,9 @@ class Rest_Test
                         U.next_diff_output = nil
                 end
                 puts "OK #{self.name}"
+                if Rest_Test.single_test_run_mode
+                        self.show_test_run_details(server_url)
+                end
                 return true
         end
         def get_xforms()
@@ -141,6 +148,10 @@ class Rest_Test
                 IO.write("#{root}/rest_of_url",      self.rest_of_url)
                 String_xform.write_xforms_to_file(self.xforms, "#{root}/xforms")
         end
+        def show_test_run_details(server_url)
+                puts "	Original behavior captured from #{self.original_server_url}"
+                puts "	Test run against                #{server_url}"
+        end
         def to_s()
                 "Rest_Test(#{rest_of_url})"
         end
@@ -156,6 +167,7 @@ class Rest_Test
                 attr_accessor :test_output_dir
                 attr_accessor :refresh_expected_on_test_diff
                 attr_accessor :reset_expected
+                attr_accessor :single_test_run_mode
                 
                 def add_xform(before_regexp_string, after)
                         if !Rest_Test.default_xforms
@@ -317,6 +329,7 @@ class Rest_Test_Generator
                 tests = []
 
                 if File.exist?("#{dir}/rest_of_url")
+                        Rest_Test.single_test_run_mode = true
                         tests << Rest_Test.from_dir(dir)
                         puts "\tReading test from #{dir}..." if Rest_Test_Generator.verbose
                 else
@@ -372,7 +385,11 @@ class Rest_Test_Generator
                 U.test
                 Json_holder.test
                 if Rest_Test_Generator.generated_test_src_url
-                        Rest_Test.test_generate_test_from_url(self.server_url, Rest_Test_Generator.generated_test_src_url)
+                        begin
+                                Rest_Test.test_generate_test_from_url(self.server_url, Rest_Test_Generator.generated_test_src_url)
+                        rescue SocketError
+                                # ignore
+                        end
                 end
                 saved_server_url = self.server_url
                 if !File.exist?("log")
@@ -485,6 +502,7 @@ while ARGV.size > j do
         when "-server_url"
                 j += 1
                 rtg.server_url = ARGV[j]
+                raise "bad server_url #{rtg.server_url}" unless rtg.server_url =~ /^https?:\/\/\w+(:\d+)?/
         when "-suppress_string"
                 j += 1
                 string_to_suppress = ARGV[j]
