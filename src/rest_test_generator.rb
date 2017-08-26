@@ -240,9 +240,9 @@ class Rest_Test_Generator
 
         def initialize()
                 Rest_Test_Generator.init()
-                if !File.directory?("tests")
-                        FileUtils.mkdir("tests")
-                end
+                #if !File.directory?("tests")
+                #        FileUtils.mkdir("tests")
+                #end
                 self.log_files_to_parse = []
         end
         def add_log_file_to_parse_later(log_fn)
@@ -270,7 +270,7 @@ class Rest_Test_Generator
                 return ok
         end
         def parse_log_file(log_fn, url_to_rt)
-                puts "parse_log_file(#{log_fn})" if Rest_Test_Generator.verbose
+                puts "parse_log_file(#{log_fn})..."
                 rest_of_url = nil
                 expected_response_text = nil
                 IO.readlines(log_fn).each do | line |
@@ -474,11 +474,11 @@ while ARGV.size > j do
                 exit(exit_code)
         when "-fail_at_end"
                 U.fail_at_end()
+        when "-generate_test_from_url"
+                Rest_Test.from_url(rtg.server_url, Rest_Test_Generator.generated_test_src_url)
         when "-generated_test_src_url"
                 j += 1
                 Rest_Test_Generator.generated_test_src_url = ARGV[j]
-        when "-generate_test_from_url"
-                Rest_Test.from_url(rtg.server_url, Rest_Test_Generator.generated_test_src_url)
         when "-generated_tests_dir"
                 j += 1
                 dir = ARGV[j]
@@ -486,12 +486,16 @@ while ARGV.size > j do
                 Rest_Test.generated_tests_dir = dir
         when "-no_default_server_suppression"
                 rtg.suppress_server_names = false
-        when /^-test_output_dir|-o$/
-                j += 1
-                rtg.test_output_dir = ARGV[j]
         when "-parse_log"
                 ARGV[j+1..-1].each do | log_fn |
                         rtg.add_log_file_to_parse_later(log_fn)
+                end
+                rtg.parse_log_files()
+                exit
+        when "-parse_logs_in_dir"
+                log_dir = ARGV[j+1]
+                Dir["#{log_dir}/*"].each do | log_fn |
+                        rtg.add_log_file_to_parse_later(log_fn)                        
                 end
                 rtg.parse_log_files()
                 exit
@@ -510,6 +514,9 @@ while ARGV.size > j do
         when "-test"
                 rtg.test()
                 exit(0)
+        when /^-test_output_dir|-o$/
+                j += 1
+                rtg.test_output_dir = ARGV[j]
         when "-v"
                 Rest_Test_Generator.verbose = true
                 Rest_Test.silent_mode = false
